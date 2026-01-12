@@ -1,6 +1,8 @@
 <img width="450" alt="n8-pro" src="https://github.com/user-attachments/assets/a7a98bc1-e5ce-4f62-bcc9-4065aa7744c8" />
+<img width="128" alt="tux" src="https://github.com/user-attachments/assets/b230c80e-e168-454b-a2e6-e1293406fb5f" />
 
-# Everdrive N8 Tools
+
+# Everdrive N8 Tools for Linux
 
 This repository documents the automated build workflows for two utilities for the Everdrive N8: **edlink-n8** and **edn8usb**  to generate a native Linux binary.
 
