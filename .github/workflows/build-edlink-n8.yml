@@ -1,4 +1,4 @@
-name: 🐧 Build edlink-n8 - linux
+name: 🐧 Build edlink-n8 - linux & windows
 
 on:
   workflow_dispatch:
@@ -36,7 +36,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Extracted version: $VERSION"
 
-      - name: 🛠️ Build edlink-n8 native binary
+      - name: 🛠️ Build Linux native binary
         working-directory: edlink-n8/edlink-n8
         run: |
           ARCH=$(uname -m)
@@ -60,6 +60,23 @@ jobs:
           echo "BIN_NAME=$BIN_NAME" >> $GITHUB_ENV
           echo "DIST_DIR=$DIST_DIR" >> $GITHUB_ENV
 
+      - name: 🛠️ Build Windows binary (.exe)
+        working-directory: edlink-n8/edlink-n8
+        run: |
+          DIST_DIR="$GITHUB_WORKSPACE/dist"
+          WIN_NAME="edlink-n8-${VERSION}-win64.exe"
+
+          mcs -out:edlink-n8.exe $(find . -name "*.cs") \
+            -r:System.Drawing.dll \
+            -r:System.Data.dll \
+            -r:System.Xml.dll
+
+          mkbundle -o $DIST_DIR/$WIN_NAME --simple edlink-n8.exe \
+            --machine-config /etc/mono/4.5/machine.config --config /etc/mono/config
+
+          cd $DIST_DIR/
+          sha256sum $WIN_NAME > $WIN_NAME.sha256
+
       - name: 📝 Generate release notes
         id: release_body
         run: |
@@ -73,10 +90,12 @@ jobs:
 
           ### 📦 Artifact
           - \`${{ env.BIN_NAME }}\`
+          - \`edlink-n8-${{ env.VERSION }}-win64.exe\`
 
           ### 🔐 SHA256
           \`\`\`
           $(cat ${{ env.DIST_DIR }}/${{ env.BIN_NAME }}.sha256)
+          $(cat ${{ env.DIST_DIR }}/edlink-n8-${{ env.VERSION }}-win64.exe.sha256)
           \`\`\`
           EOF
 
@@ -93,6 +112,8 @@ jobs:
           files: |
             ${{ env.DIST_DIR }}/${{ env.BIN_NAME }}
             ${{ env.DIST_DIR }}/${{ env.BIN_NAME }}.sha256
+            ${{ env.DIST_DIR }}/edlink-n8-${{ env.VERSION }}-win64.exe
+            ${{ env.DIST_DIR }}/edlink-n8-${{ env.VERSION }}-win64.exe.sha256
           overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
