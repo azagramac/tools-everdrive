@@ -10,6 +10,60 @@ Latest firmware: [https://krikzz.com/pub/support/everdrive-n8/pro-series/firmwar
 
 ---
 
+## Requeriments
+
+```bash
+sudo apt update
+sudo apt install -y mono-complete
+```
+
+## Check
+glibc
+```bash
+ldd --version
+```
+
+mono
+```bash
+mono --version
+```
+
+## Running
+Running native
+```bash
+./edlink-n8-1.0.0.7-x86_64
+```
+```bash
+./edn8usb-linux-x86_64
+```
+
+Installing GLIBC 2.38 (if needed)
+If you encounter errors related to GLIBC versions, you can install the latest version manually
+```bash
+sudo apt install -y build-essential wget tar
+```
+```bash
+wget http://ftp.gnu.org/gnu/libc/glibc-2.38.tar.gz
+tar -xvf glibc-2.38.tar.gz
+cd glibc-2.38 && mkdir build && cd build
+../configure --prefix=/opt/glibc-2.38
+make -j$(nproc)
+sudo make install
+export LD_LIBRARY_PATH=/opt/glibc-2.38/lib:$LD_LIBRARY_PATH
+```
+
+Running with Mono
+```bash
+mono edlink-n8-1.0.0.7-win64.exe
+```
+```bash
+mono edn8usb-win64.exe
+```
+
+
+
+---
+
 ## edlink-n8
 
 **Description:**  
