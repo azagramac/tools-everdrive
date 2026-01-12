@@ -1,0 +1,88 @@
+name: 🐧 Build edn8usb - linux
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-edn8usb:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout edn8usb repository
+        uses: actions/checkout@v6
+        with:
+          repository: masible/edn8usb
+          path: edn8usb
+
+      - name: ⚙️ Install Mono toolchain
+        run: |
+          sudo apt update -qq
+          sudo apt install -y mono-complete
+
+      - name: 🔍 Verify Mono installation
+        run: |
+          mono --version
+          mcs --version
+          which mkbundle
+
+      - name: 🧾 Extract version from AssemblyInfo.cs
+        id: extract_version
+        run: |
+          # Busca AssemblyFileVersion en Properties/AssemblyInfo.cs
+          VERSION=$(grep 'AssemblyFileVersion' edn8usb/edn8usb/Properties/AssemblyInfo.cs \
+            | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          
+          echo "Extracted version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: 🛠️ Build edn8usb
+        working-directory: edn8usb/edn8usb
+        run: |
+          make clean || true
+          make
+
+      - name: 📦 Prepare release artifacts
+        run: |
+          mkdir -p dist
+          cp edn8usb/edn8usb/edn8usb dist/edn8usb-linux-x86_64
+          chmod +x dist/edn8usb-linux-x86_64
+          sha256sum dist/edn8usb-linux-x86_64 > dist/edn8usb-linux-x86_64.sha256
+
+      - name: 📝 Generate release notes
+        id: release_body
+        run: |
+          cat <<EOF > release.md
+          ## 🧰 edn8usb
+
+          Binary built from:
+          - Repository: https://github.com/masible/edn8usb
+          - Toolchain: Mono + mkbundle
+
+          ### 📦 Artifact
+          - \`edn8usb-linux-x86_64\`
+
+          ### 🔐 SHA256
+          \`\`\`
+          $(cat dist/edn8usb-linux-x86_64.sha256)
+          \`\`\`
+          EOF
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat release.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Upload GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: "edn8usb ${{ env.VERSION }}"
+          body: ${{ steps.release_body.outputs.body }}
+          files: |
+            dist/edn8usb-linux-x86_64
+            dist/edn8usb-linux-x86_64.sha256
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
