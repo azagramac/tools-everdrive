@@ -1,4 +1,4 @@
-name: 🐧 Build edn8usb - linux
+name: 🐧 Build edn8usb - linux & windows
 
 on:
   workflow_dispatch:
@@ -31,25 +31,36 @@ jobs:
       - name: 🧾 Extract version from AssemblyInfo.cs
         id: extract_version
         run: |
-          # Busca AssemblyFileVersion en Properties/AssemblyInfo.cs
           VERSION=$(grep 'AssemblyFileVersion' edn8usb/edn8usb/Properties/AssemblyInfo.cs \
             | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
-          
           echo "Extracted version: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: 🛠️ Build edn8usb
+      - name: 🛠️ Build Linux binary
         working-directory: edn8usb/edn8usb
         run: |
+          mkdir -p ../../dist
           make clean || true
           make
+          cp edn8usb ../../dist/edn8usb-linux-x86_64
+          chmod +x ../../dist/edn8usb-linux-x86_64
 
-      - name: 📦 Prepare release artifacts
+      - name: 📝 Generate SHA for Linux binary
         run: |
-          mkdir -p dist
-          cp edn8usb/edn8usb/edn8usb dist/edn8usb-linux-x86_64
-          chmod +x dist/edn8usb-linux-x86_64
-          sha256sum dist/edn8usb-linux-x86_64 > dist/edn8usb-linux-x86_64.sha256
+          cd dist
+          sha256sum edn8usb-linux-x86_64 > edn8usb-linux-x86_64.sha256
+
+      - name: 🛠️ Build Windows binary (.exe)
+        working-directory: edn8usb/edn8usb
+        run: |
+          mcs -out:edn8usb.exe Program.cs
+          mkbundle -o ../../dist/edn8usb-win64.exe --simple edn8usb.exe \
+            --machine-config /etc/mono/4.5/machine.config --config /etc/mono/config
+
+      - name: 📝 Generate SHA for Windows binary
+        run: |
+          cd dist
+          sha256sum edn8usb-win64.exe > edn8usb-win64.exe.sha256
 
       - name: 📝 Generate release notes
         id: release_body
@@ -63,10 +74,12 @@ jobs:
 
           ### 📦 Artifact
           - \`edn8usb-linux-x86_64\`
+          - \`edn8usb-win64.exe\`
 
           ### 🔐 SHA256
           \`\`\`
           $(cat dist/edn8usb-linux-x86_64.sha256)
+          $(cat dist/edn8usb-win64.exe.sha256)
           \`\`\`
           EOF
 
@@ -83,6 +96,8 @@ jobs:
           files: |
             dist/edn8usb-linux-x86_64
             dist/edn8usb-linux-x86_64.sha256
+            dist/edn8usb-win64.exe
+            dist/edn8usb-win64.exe.sha256
           overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
