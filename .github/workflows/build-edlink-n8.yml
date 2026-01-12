@@ -1,0 +1,98 @@
+name: 🐧 Build edlink-n8 - linux
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-edlink-n8:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v6
+        with:
+          repository: krikzz/edn8-pro-pub
+          path: edlink-n8
+
+      - name: ⚙️ Install Mono toolchain
+        run: |
+          sudo apt update -qq
+          sudo apt install -y mono-complete
+
+      - name: 🔍 Verify Mono installation
+        run: |
+          mono --version
+          mcs --version
+          which mkbundle
+
+      - name: 🧾 Extract version from AssemblyInfo.cs
+        id: extract_version
+        run: |
+          VERSION=$(grep 'AssemblyFileVersion' edlink-n8/edlink-n8/edlink-n8/Properties/AssemblyInfo.cs \
+            | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Extracted version: $VERSION"
+
+      - name: 🛠️ Build edlink-n8 native binary
+        working-directory: edlink-n8/edlink-n8
+        run: |
+          ARCH=$(uname -m)
+          BIN_NAME="edlink-n8-${VERSION}-${ARCH}"
+          DIST_DIR="$GITHUB_WORKSPACE/dist"
+
+          mkdir -p $DIST_DIR
+
+          mcs -out:edlink-n8.exe $(find . -name "*.cs") \
+            -r:System.Drawing.dll \
+            -r:System.Data.dll \
+            -r:System.Xml.dll
+
+          mkbundle -o $DIST_DIR/$BIN_NAME --simple edlink-n8.exe \
+            --machine-config /etc/mono/4.5/machine.config --config /etc/mono/config
+
+          chmod +x $DIST_DIR/$BIN_NAME
+          cd $DIST_DIR/
+          sha256sum $BIN_NAME > $BIN_NAME.sha256
+
+          echo "BIN_NAME=$BIN_NAME" >> $GITHUB_ENV
+          echo "DIST_DIR=$DIST_DIR" >> $GITHUB_ENV
+
+      - name: 📝 Generate release notes
+        id: release_body
+        run: |
+          cat <<EOF > release.md
+          ## 🧰 edlink-n8
+
+          Binary built from:
+          - Repository: https://github.com/krikzz/edn8-pro-pub
+          - Version: ${{ env.VERSION }}
+          - Architecture: $(uname -m)
+
+          ### 📦 Artifact
+          - \`${{ env.BIN_NAME }}\`
+
+          ### 🔐 SHA256
+          \`\`\`
+          $(cat ${{ env.DIST_DIR }}/${{ env.BIN_NAME }}.sha256)
+          \`\`\`
+          EOF
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat release.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Upload GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: "edlink-n8 ${{ env.VERSION }}"
+          body: ${{ steps.release_body.outputs.body }}
+          files: |
+            ${{ env.DIST_DIR }}/${{ env.BIN_NAME }}
+            ${{ env.DIST_DIR }}/${{ env.BIN_NAME }}.sha256
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
